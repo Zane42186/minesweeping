@@ -1,0 +1,205 @@
+#include<SFML/Graphics.hpp>
+#include <iostream>
+#include<ctime>
+#include<random>
+#include<conio.h>
+
+using namespace std;
+using namespace sf;
+
+
+
+//5，定义常量   --- 方便 修改和维护 -- 数字在代码中过多，无法知道意思，将数字定义为常量，更直观且更已修改维护
+//原先每个格子的大小
+const int ORI_GRID_SIZE = 72; //original -- 原来的
+//窗口中每个格子的大小
+const int GRID_SIZE = 36;
+//地图的列,行
+const int MAP_COL = 15;
+const int MAP_ROW = 10;
+//窗口的大小
+const int WIN_WIDE = GRID_SIZE * (MAP_COL + 2);
+const int WIN_LONG = GRID_SIZE * (MAP_ROW + 2);
+
+//定义一个方向判断雷的数量
+const int Dir[8][2]{
+	{-1,-1},{-1,0},{-1,1},//上
+	{0,-1},{0,1},//中
+	{1,-1},{1,0},{1,1}//下
+};
+
+//定义一个枚举变量，--每个格子的类型
+enum GridType {
+	//空格
+	Grid_EMPYT = 0,
+	//1 - 8 count -- 计数，点数
+	Grid_COUNT_1 = 1,
+	Grid_COUNT_2 = 2,
+	Grid_COUNT_3 = 3,
+	Grid_COUNT_4 = 4,
+	Grid_COUNT_5 = 5,
+	Grid_COUNT_6 = 6,
+	Grid_COUNT_7 = 7,
+	Grid_COUNT_8 = 8,
+	//炸弹
+	Grid_BOMB = 9,
+	//隐藏的方块
+	Grid_HIDE = 10,
+	//旗帜
+	Grid_FLAG = 11,
+};
+
+
+//将格子类化
+class Grid {
+public:
+	Grid() {
+		m_showGridType = GridType::Grid_EMPYT;
+		m_realGridType = GridType::Grid_EMPYT;
+	}
+	//展示方块
+	//设置展示方块
+	void SetShowGridType(GridType ShowGridType) {
+		m_showGridType = ShowGridType;
+	}
+	//得到展示方块
+	GridType GetShowGridType() const {
+		return m_showGridType;
+	}
+
+	//实际方块
+	//设置实际方块
+	void SetRealGridType(GridType RealGridType) {
+		m_realGridType = RealGridType;
+	}
+	//得到实际方块
+	GridType GetRealGridType() const {
+		return m_realGridType;
+	}
+
+private:
+	GridType m_showGridType;
+	GridType m_realGridType;
+
+
+
+};
+
+int main() {
+	srand(time(0));
+	//使用创立RenderWindow 对象win创建一个窗口宽，高,
+	RenderWindow win(VideoMode(WIN_WIDE, WIN_LONG),L"飞鱼版扫雷");//前面加入""L -- 识别为长字符类型wchar 一般存储为2字节及以上字节
+	Texture t;//创建一个纹理对象
+	//将图片写入内存
+	t.loadFromFile("minesweeping.jpg");
+	//创建一个精灵对象 -- 实现对图片矩阵的平移，缩放等功能
+	Sprite s(t);
+	/*
+	类化前
+	//4.定义初始地图  15列10行，防止下标越界 + 1；
+	//GridType showGrid[MAP_COL + 1][MAP_ROW + 1]; // -- grid -- 网格,格子
+	//6,定义随机地图
+	//GridType grid[MAP_COL + 1][MAP_ROW + 1];
+	*/
+	//定义一个Grid对象储存地图
+	Grid grid[MAP_COL + 1][MAP_ROW + 1];
+
+	//定义实际地图的炸弹
+	for (int i = 1;i <= MAP_COL;++i) {
+		for (int j = 1;j <= MAP_ROW;++j) {
+			//1/6的概率出炸弹
+			if (rand() % 6 == 0) {
+				grid[i][j].SetRealGridType(GridType::Grid_BOMB);
+			}
+			else {
+				grid[i][j].SetRealGridType(GridType::Grid_EMPYT);
+			}
+		}
+	}
+
+	//判断周围有多少个炸弹
+	for (int y = 1;y <= MAP_COL;++y) {
+		for (int x = 1;x <= MAP_ROW;++x) {
+			//为空这遍历周围格子
+			if (grid[y][x].GetRealGridType() == GridType::Grid_EMPYT) {
+				//定义一个计数
+				int cnt = 0;
+				for (int k = 0; k < 8;++k) {
+					int ty = y + Dir[k][0];
+					int tx = x + Dir[k][1];
+					if (grid[y][x].GetRealGridType() == GridType::Grid_BOMB) {
+						cnt++;
+					}
+				}
+				//将cnt强制转化为GridType类型
+				grid[y][x].SetRealGridType((GridType)cnt);
+			}
+		}
+	}
+	//定义初始展示地图
+	for (int i = 1;i <= MAP_COL;++i) {
+		for (int j = 1;j <= MAP_ROW;++j) {
+			grid[i][j].SetShowGridType(GridType::Grid_HIDE);
+		}
+	}
+	//win.isOpen() -- 窗口打开下
+	while (win.isOpen()) {
+		//2,定义窗口关闭
+		Event e;//事件
+		//定义一个整数的二维向量
+		Vector2i pos = Mouse::getPosition(win);
+
+		int x = pos.x / GRID_SIZE;
+		int y = pos.y / GRID_SIZE;
+
+		while(win.pollEvent(e)) {
+			if (e.type == Event::Closed) {//如果事件为关闭，这关闭win窗口
+				cout << "窗口关闭" << endl;//输出在控制台
+				win.close();
+			}
+			//判断鼠标事件
+			if (e.type == Event::MouseButtonPressed) {
+				//判断鼠标行为
+				//左键
+				if (e.key.code == Mouse::Left) {
+					grid[x][y].SetShowGridType(grid[x][y].GetRealGridType());
+					//自动展开空格周围格子
+					if (grid[x][y].GetShowGridType() == GridType::Grid_EMPYT) {
+						for (int k = 0; k < 8;++k) {
+							int ty = y + Dir[k][0];
+							int tx = x + Dir[k][1];
+							grid[tx][ty].SetShowGridType(grid[tx][ty].GetRealGridType());
+						}
+					}
+				}
+				//右键
+				else if (e.key.code == Mouse::Right) {
+					grid[x][y].SetShowGridType(GridType::Grid_FLAG);
+				}
+			}
+		}
+		
+		//将矩形进行缩放
+		s.setScale(Vector2f(0.5, 0.5));
+
+		//点到炸弹自动展示全图
+		for (int i = 1;i <= MAP_COL;++i) {
+			for (int j = 1;j <= MAP_ROW;++j) {
+				if (grid[x][y].GetShowGridType() == GridType::Grid_BOMB) {
+					grid[i][j].SetShowGridType(grid[i][j].GetRealGridType());
+				}
+				
+				//定义一个纹理矩形（左上角坐标， - - - -，大小， - - - -）
+				s.setTextureRect(IntRect(ORI_GRID_SIZE * grid[i][j].GetShowGridType(), 0, ORI_GRID_SIZE, ORI_GRID_SIZE));
+				//设置该矩形位置
+				s.setPosition(0.0f + i  * GRID_SIZE,0.0f +  j* GRID_SIZE);//0.0f为浮点数，相加转换为float类型的值
+				//将该矩形绘制到win对象中
+				win.draw(s);
+			}
+		}	
+		//将win对象中的矩形展现到窗口中
+		win.display();
+
+	}
+	return 0;
+}
